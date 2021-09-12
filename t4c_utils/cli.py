@@ -44,7 +44,7 @@ def cli():
     ),
 )
 def extract(install_directory, output_directory, server):
-    #extract_rtmap(install_directory, output_directory, server)
+    extract_rtmap(install_directory, output_directory, server)
     extract_sprite_ids(install_directory, output_directory, server)
 
 
