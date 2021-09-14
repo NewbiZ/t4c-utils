@@ -7,17 +7,25 @@ import hashlib
 LOGGER = logging.getLogger(__name__)
 
 
-def load_sprite_ids(tilefile):
-    tilefile.seek(0)
-    hash_1 = struct.unpack('<' + 'c' * 16, tilefile.read(16))
-    size_orig = struct.unpack('<L', tilefile.read(4))[0]
-    size_comp = struct.unpack('<L', tilefile.read(4))[0]
-    hash_2 = struct.unpack('<' + 'c' * 17, tilefile.read(17))
+def load_sprite_ids(idfile):
+    idfile.seek(0)
+    # First part of the md5 checksum of the decompressed but still encrypted
+    # data
+    hash_1 = struct.unpack('<' + 'c' * 16, idfile.read(16))
+    # Original (uncompressed) size
+    size_orig = struct.unpack('<L', idfile.read(4))[0]
+    # Compressed size
+    size_comp = struct.unpack('<L', idfile.read(4))[0]
+    # Second part of the hash
+    hash_2 = struct.unpack('<' + 'c' * 17, idfile.read(17))
+    # Reconstruct the md5 checksum
     hash_full = b''.join(hash_1 + hash_2)[:-1].decode('ascii')
 
-    ids = []
-    data_comp = tilefile.read(size_comp)
+    # Decompress data
+    data_comp = idfile.read(size_comp)
     data = zlib.decompress(data_comp)
+
+    # Check the expected versus computed checksum
     hash_real = hashlib.md5(data).hexdigest()
 
     if hash_real != hash_full:
@@ -26,8 +34,11 @@ def load_sprite_ids(tilefile):
         LOGGER.warning(f'Computed checksum: {hash_real}')
         return
 
+    # Decrypt data
     data = bytes([d ^ 0x99 for d in data])
 
+    # Parse sprite ids
+    ids = []
     for i in range(0, len(data), 64 + 256 + 4 + 8):
         ids += [{
             'name': data[i: i+64].decode('utf-8').strip('\x00'),
@@ -36,6 +47,6 @@ def load_sprite_ids(tilefile):
             'dda': struct.unpack('<Q', data[i+64+256+4: i+64+256+4+8])[0],
         }]
 
-    checksum = struct.unpack('<c', tilefile.read(1))[0]
+    checksum = struct.unpack('<c', idfile.read(1))[0]
 
     return ids
